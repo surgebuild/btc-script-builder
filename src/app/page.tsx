@@ -21,9 +21,11 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-600">
-              {isConnected ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)} • p2tr` : "1b1p5l...62r8 • p2tr"}
-            </div>
+            {isConnected && walletAddress && (
+              <div className="text-sm text-gray-600">
+                {`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)} • p2tr`}
+              </div>
+            )}
             {isConnected && (
               <button
                 onClick={disconnect}
@@ -48,8 +50,19 @@ export default function Home() {
         {isConnected && <ScriptBuilder />}
         
         {!isConnected && (
-          <div className="text-center text-gray-500 mt-12">
-            <p>Please connect your UniSat wallet to access the script builder</p>
+          <div className="max-w-2xl mx-auto text-center py-16">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Bitcoin Script Builder
+            </h1>
+            <p className="text-lg text-gray-600 mb-8">
+              Create and broadcast custom Bitcoin script transactions on testnet
+            </p>
+            <button
+              onClick={connect}
+              className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium"
+            >
+              Connect UniSat Wallet
+            </button>
           </div>
         )}
       </div>
