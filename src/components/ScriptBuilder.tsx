@@ -482,7 +482,6 @@ OP_EQUAL
                       <div className={`transform transition-transform text-zinc-400 ${showScriptPreview ? "rotate-90" : ""}`}>▶</div>
                       <span className="text-zinc-200 font-mono text-sm font-semibold">On Chain Script Preview</span>
                     </div>
-                    <div className="text-xs text-zinc-500 font-mono">{values.scriptCode.trim() ? "" : "Enter script code"}</div>
                   </button>
 
                   {showScriptPreview && (
