@@ -1,14 +1,9 @@
 "use client";
 
-import React, {
-  createContext,
-  useState,
-  useContext,
-  ReactNode,
-  useEffect,
-} from "react";
+import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
 import { toast } from "sonner";
 import { Buffer } from "buffer";
+import { fetchBalance } from "@/hooks/api";
 
 interface WalletContextType {
   walletAddress: string | null;
@@ -28,13 +23,9 @@ const WalletContext = createContext<WalletContextType>({
   getPublicKey: async () => null,
 });
 
-export const WalletProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Initialize state from localStorage
-  const [walletAddress, setWalletAddress] = useState<string | null>(() =>
-    typeof window !== 'undefined' ? localStorage.getItem("walletAddress") : null
-  );
+  const [walletAddress, setWalletAddress] = useState<string | null>(() => (typeof window !== "undefined" ? localStorage.getItem("walletAddress") : null));
   const [isConnected, setIsConnected] = useState(!!walletAddress);
   const [balance, setBalance] = useState<number | null>(null);
 
@@ -51,8 +42,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
             console.log(signetAddress, "signetAddress");
             setWalletAddress(signetAddress);
 
-            const walletBalance = await window.unisat.getBalance();
-            setBalance(walletBalance.total);
+            const walletBalance = await fetchBalance(signetAddress);
+            setBalance(walletBalance);
             setIsConnected(true);
           } else {
             // Stored address no longer valid
@@ -83,11 +74,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       if (!accounts.length) return;
 
       await window.unisat.switchNetwork("testnet");
-      const walletBalance = await window.unisat.getBalance();
+      const walletBalance = await fetchBalance(accounts[0]);
 
       setWalletAddress(accounts[0]);
       localStorage.setItem("walletAddress", accounts[0]);
-      setBalance(walletBalance.total);
+      setBalance(walletBalance);
       setIsConnected(true);
       toast.success("Wallet connected");
     } catch (error) {
