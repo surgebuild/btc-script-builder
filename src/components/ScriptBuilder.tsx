@@ -5,17 +5,12 @@ import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
 import { useBtcWallet } from "@/lib/context/WalletContext";
-import { createScriptTransaction } from "@/lib/scriptUtils";
+import { createScriptTransaction, addressToHex, isBitcoinAddress } from "@/lib/scriptUtils";
 import { requestFaucetFunds } from "@/hooks/faucet";
 
 const ScriptSchema = Yup.object().shape({
-  scriptCode: Yup.string()
-    .required("Script code is required")
-    .min(1, "Script cannot be empty"),
-  amount: Yup.number()
-    .positive("Amount must be positive")
-    .min(546, "Minimum amount is 546 sats (dust threshold)")
-    .required("Amount is required"),
+  scriptCode: Yup.string().required("Script code is required").min(1, "Script cannot be empty"),
+  amount: Yup.number().positive("Amount must be positive").min(546, "Minimum amount is 546 sats (dust threshold)").required("Amount is required"),
 });
 
 const SCRIPT_EXAMPLES = {
@@ -23,7 +18,7 @@ const SCRIPT_EXAMPLES = {
 OP_SHA256 
 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 
 OP_EQUAL`,
-  
+
   timelock: `// Relative Timelock - funds locked for 144 blocks
 144 
 OP_CHECKSEQUENCEVERIFY 
@@ -33,7 +28,7 @@ OP_HASH160
 0x89abcdefabbaabbaabbaabbaabbaabbaabbaabba 
 OP_EQUALVERIFY 
 OP_CHECKSIG`,
-  
+
   multisig: `// 2-of-3 Multisig
 OP_2 
 0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 
@@ -41,21 +36,21 @@ OP_2
 0x03e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13 
 OP_3 
 OP_CHECKMULTISIG`,
-  
+
   puzzle: `// Math Puzzle - requires inputs that add to 10
 OP_ADD 
 10 
-OP_EQUAL`
+OP_EQUAL`,
 };
 
-type TransactionStep = 'prepare' | 'validate' | 'sign' | 'broadcast' | 'complete';
+type TransactionStep = "prepare" | "validate" | "sign" | "broadcast" | "complete";
 
 export default function ScriptBuilder() {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [scriptAddress, setScriptAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedExample, setSelectedExample] = useState<string>("");
-  const [currentStep, setCurrentStep] = useState<TransactionStep>('prepare');
+  const [currentStep, setCurrentStep] = useState<TransactionStep>("prepare");
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
   const [faucetLoading, setFaucetLoading] = useState(false);
   const { isConnected, walletAddress, getPublicKey, balance } = useBtcWallet();
@@ -73,29 +68,24 @@ export default function ScriptBuilder() {
 
     try {
       setLoading(true);
-      setCurrentStep('validate');
-      
+      setCurrentStep("validate");
+
       // Validate script syntax first
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setCurrentStep('sign');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      setCurrentStep("sign");
       const publicKey = await getPublicKey();
-      
+
       if (!publicKey) {
         toast.error("Failed to get public key");
-        setCurrentStep('prepare');
+        setCurrentStep("prepare");
         return;
       }
 
-      setCurrentStep('broadcast');
-      const result = await createScriptTransaction(
-        values.scriptCode,
-        values.amount,
-        walletAddress!,
-        publicKey
-      );
+      setCurrentStep("broadcast");
+      const result = await createScriptTransaction(values.scriptCode, values.amount, walletAddress!, publicKey);
 
-      setCurrentStep('complete');
+      setCurrentStep("complete");
       setTxHash(result.txid);
       setScriptAddress(result.scriptAddress);
       setTransactionDetails({
@@ -103,12 +93,12 @@ export default function ScriptBuilder() {
         fee: 500, // This should come from the transaction creation
         scriptCode: values.scriptCode,
       });
-      
+
       toast.success("Script transaction created successfully!");
     } catch (error) {
       console.error("Script transaction error:", error);
-      toast.error(`Failed to create script transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setCurrentStep('prepare');
+      toast.error(`Failed to create script transaction: ${error instanceof Error ? error.message : "Unknown error"}`);
+      setCurrentStep("prepare");
     } finally {
       setLoading(false);
     }
@@ -125,8 +115,43 @@ export default function ScriptBuilder() {
   const resetTransaction = () => {
     setTxHash(null);
     setScriptAddress(null);
-    setCurrentStep('prepare');
+    setCurrentStep("prepare");
     setTransactionDetails(null);
+  };
+
+  // Auto-convert Bitcoin addresses to hex when pasted
+  const handlePaste = (event: React.ClipboardEvent, setFieldValue: any, currentValue: string) => {
+    const pastedText = event.clipboardData.getData("text");
+    const trimmedText = pastedText.trim();
+
+    console.log("Pasted text:", trimmedText);
+
+    if (isBitcoinAddress(trimmedText)) {
+      console.log("Detected Bitcoin address");
+      const hex = addressToHex(trimmedText);
+
+      if (hex) {
+        event.preventDefault();
+
+        // Insert hex at cursor position or append to current content
+        const textarea = event.target as HTMLTextAreaElement;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+
+        const newValue = currentValue.substring(0, start) + hex + currentValue.substring(end);
+        setFieldValue("scriptCode", newValue);
+
+        toast.success(`Converted ${trimmedText.slice(0, 20)}... to hex: ${hex.slice(0, 20)}...`);
+
+        // Set cursor position after the inserted hex
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + hex.length;
+          textarea.focus();
+        }, 0);
+      } else {
+        toast.error("Could not extract public key from this address type. Only Taproot addresses (tb1p...) support direct conversion.");
+      }
+    }
   };
 
   const handleFaucetRequest = async () => {
@@ -138,9 +163,9 @@ export default function ScriptBuilder() {
     try {
       setFaucetLoading(true);
       toast.info("Requesting testnet funds from faucet...");
-      
+
       const result = await requestFaucetFunds(walletAddress);
-      
+
       if (result && result.txid) {
         toast.success(`Faucet funds sent! Transaction ID: ${result.txid.substring(0, 16)}...`);
         console.log("Faucet transaction:", result);
@@ -151,9 +176,9 @@ export default function ScriptBuilder() {
       }
     } catch (error) {
       console.error("Faucet request error:", error);
-      
+
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      
+
       // Handle different types of errors with appropriate fallbacks
       if (errorMessage.includes("CORS") || errorMessage.includes("Network error")) {
         toast.error("Faucet API temporarily unavailable. Please try again later.");
@@ -170,30 +195,30 @@ export default function ScriptBuilder() {
   };
 
   const getStepIcon = (step: TransactionStep) => {
-    const steps = ['prepare', 'validate', 'sign', 'broadcast', 'complete'];
+    const steps = ["prepare", "validate", "sign", "broadcast", "complete"];
     const currentIndex = steps.indexOf(currentStep);
     const stepIndex = steps.indexOf(step);
-    
-    if (stepIndex < currentIndex || currentStep === 'complete') {
-      return '✓';
+
+    if (stepIndex < currentIndex || currentStep === "complete") {
+      return "✓";
     } else if (stepIndex === currentIndex && loading) {
-      return '⏳';
+      return "⏳";
     } else {
       return stepIndex + 1;
     }
   };
 
   const getStepStatus = (step: TransactionStep) => {
-    const steps = ['prepare', 'validate', 'sign', 'broadcast', 'complete'];
+    const steps = ["prepare", "validate", "sign", "broadcast", "complete"];
     const currentIndex = steps.indexOf(currentStep);
     const stepIndex = steps.indexOf(step);
-    
-    if (stepIndex < currentIndex || currentStep === 'complete') {
-      return 'complete';
+
+    if (stepIndex < currentIndex || currentStep === "complete") {
+      return "complete";
     } else if (stepIndex === currentIndex) {
-      return 'active';
+      return "active";
     } else {
-      return 'pending';
+      return "pending";
     }
   };
 
@@ -204,28 +229,11 @@ export default function ScriptBuilder() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Transaction Progress</h3>
           <div className="flex items-center justify-between">
-            {(['prepare', 'validate', 'sign', 'broadcast', 'complete'] as TransactionStep[]).map((step, index) => (
+            {(["prepare", "validate", "sign", "broadcast", "complete"] as TransactionStep[]).map((step, index) => (
               <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  getStepStatus(step) === 'complete' 
-                    ? 'bg-green-500 text-white'
-                    : getStepStatus(step) === 'active'
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {getStepIcon(step)}
-                </div>
-                <span className={`ml-2 text-sm ${
-                  getStepStatus(step) === 'complete' ? 'text-green-600' :
-                  getStepStatus(step) === 'active' ? 'text-orange-600' : 'text-gray-500'
-                }`}>
-                  {step.charAt(0).toUpperCase() + step.slice(1)}
-                </span>
-                {index < 4 && (
-                  <div className={`w-8 h-0.5 mx-4 ${
-                    getStepStatus(step) === 'complete' ? 'bg-green-500' : 'bg-gray-200'
-                  }`} />
-                )}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${getStepStatus(step) === "complete" ? "bg-green-500 text-white" : getStepStatus(step) === "active" ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-600"}`}>{getStepIcon(step)}</div>
+                <span className={`ml-2 text-sm ${getStepStatus(step) === "complete" ? "text-green-600" : getStepStatus(step) === "active" ? "text-orange-600" : "text-gray-500"}`}>{step.charAt(0).toUpperCase() + step.slice(1)}</span>
+                {index < 4 && <div className={`w-8 h-0.5 mx-4 ${getStepStatus(step) === "complete" ? "bg-green-500" : "bg-gray-200"}`} />}
               </div>
             ))}
           </div>
@@ -243,11 +251,7 @@ export default function ScriptBuilder() {
               </div>
             )}
             {isConnected && (
-              <button
-                onClick={handleFaucetRequest}
-                disabled={faucetLoading}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
+              <button onClick={handleFaucetRequest} disabled={faucetLoading} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
                 {faucetLoading ? (
                   <>
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -275,25 +279,14 @@ export default function ScriptBuilder() {
           validationSchema={ScriptSchema}
           onSubmit={handleSubmit}
         >
-          {({ errors, touched, setFieldValue }) => (
+          {({ errors, touched, setFieldValue, values }) => (
             <Form className="space-y-6">
               {/* Script Examples */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Load Example Script
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Load Example Script</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {Object.entries(SCRIPT_EXAMPLES).map(([key]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => loadExample(key, setFieldValue)}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                        selectedExample === key
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
+                    <button key={key} type="button" onClick={() => loadExample(key, setFieldValue)} className={`px-4 py-2 text-sm rounded-lg border transition-colors ${selectedExample === key ? "bg-orange-500 text-white border-orange-500" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}>
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                     </button>
                   ))}
@@ -305,23 +298,11 @@ export default function ScriptBuilder() {
                 <label htmlFor="scriptCode" className="block text-sm font-medium text-gray-700 mb-2">
                   Bitcoin Script Code
                 </label>
-                <Field
-                  as="textarea"
-                  id="scriptCode"
-                  name="scriptCode"
-                  rows={12}
-                  placeholder="Enter your Bitcoin script code here... (e.g., OP_SHA256 0x... OP_EQUAL)"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 font-mono text-sm bg-gray-50 ${
-                    errors.scriptCode && touched.scriptCode
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
-                  }`}
-                />
-                <ErrorMessage
-                  name="scriptCode"
-                  component="div"
-                  className="text-red-500 text-sm mt-1"
-                />
+                <Field name="scriptCode">{({ field }: any) => <textarea {...field} id="scriptCode" rows={12} placeholder="Enter your Bitcoin script code here... Paste Bitcoin addresses to auto-convert to hex! (e.g., OP_SHA256 0x... OP_EQUAL)" onPaste={(e) => handlePaste(e, setFieldValue, values.scriptCode)} className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 font-mono text-sm bg-gray-50 ${errors.scriptCode && touched.scriptCode ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"}`} />}</Field>
+                <ErrorMessage name="scriptCode" component="div" className="text-red-500 text-sm mt-1" />
+                <div className="text-xs text-gray-600 mt-2">
+                  💡 <strong>Tip:</strong> Paste Bitcoin addresses directly into the script editor - they'll automatically convert to hex format! Currently supports Taproot addresses (tb1p...).
+                </div>
               </div>
 
               {/* Transaction Details */}
@@ -330,40 +311,18 @@ export default function ScriptBuilder() {
                   <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
                     Amount (sats)
                   </label>
-                  <Field
-                    type="number"
-                    id="amount"
-                    name="amount"
-                    placeholder="Enter amount in satoshis"
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
-                      errors.amount && touched.amount
-                        ? "border-red-500 focus:ring-red-500"
-                        : "border-gray-300 focus:ring-orange-500"
-                    }`}
-                  />
-                  <ErrorMessage
-                    name="amount"
-                    component="div"
-                    className="text-red-500 text-sm mt-1"
-                  />
+                  <Field type="number" id="amount" name="amount" placeholder="Enter amount in satoshis" className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${errors.amount && touched.amount ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"}`} />
+                  <ErrorMessage name="amount" component="div" className="text-red-500 text-sm mt-1" />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Estimated Fee
-                  </label>
-                  <div className="px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
-                    ~500 sats
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Fee</label>
+                  <div className="px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">~500 sats</div>
                 </div>
               </div>
 
               {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading || !isConnected || currentStep !== 'prepare'}
-                className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
+              <button type="submit" disabled={loading || !isConnected || currentStep !== "prepare"} className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-medium">
                 {loading ? (
                   <span className="flex items-center justify-center">
                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -372,7 +331,7 @@ export default function ScriptBuilder() {
                     </svg>
                     Processing Transaction...
                   </span>
-                ) : currentStep === 'complete' ? (
+                ) : currentStep === "complete" ? (
                   "Transaction Complete"
                 ) : (
                   "Create Script Transaction"
@@ -386,25 +345,19 @@ export default function ScriptBuilder() {
       {/* Transaction Result */}
       {txHash && scriptAddress && (
         <div className="bg-white rounded-lg border border-green-200 p-6 border-l-4 border-l-green-500">
-          <h3 className="text-lg font-semibold text-green-800 mb-4">
-            🎉 Transaction Created Successfully!
-          </h3>
-          
+          <h3 className="text-lg font-semibold text-green-800 mb-4">🎉 Transaction Created Successfully!</h3>
+
           <div className="space-y-3 text-sm">
             <div>
               <span className="font-medium text-gray-700">Transaction ID:</span>
-              <div className="mt-1 p-2 bg-gray-50 rounded font-mono text-xs break-all">
-                {txHash}
-              </div>
+              <div className="mt-1 p-2 bg-gray-50 rounded font-mono text-xs break-all">{txHash}</div>
             </div>
-            
+
             <div>
               <span className="font-medium text-gray-700">Script Address:</span>
-              <div className="mt-1 p-2 bg-gray-50 rounded font-mono text-xs break-all">
-                {scriptAddress}
-              </div>
+              <div className="mt-1 p-2 bg-gray-50 rounded font-mono text-xs break-all">{scriptAddress}</div>
             </div>
-            
+
             {transactionDetails && (
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div>
@@ -418,20 +371,12 @@ export default function ScriptBuilder() {
               </div>
             )}
           </div>
-          
+
           <div className="flex flex-wrap gap-3 mt-4">
-            <a
-              href={`https://mempool.space/testnet/tx/${txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            >
+            <a href={`https://signet.surge.dev/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm">
               View on Explorer →
             </a>
-            <button
-              onClick={resetTransaction}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-            >
+            <button onClick={resetTransaction} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm">
               Create Another Transaction
             </button>
           </div>
@@ -440,9 +385,7 @@ export default function ScriptBuilder() {
 
       {/* Help Section */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-3">
-          💡 How to Use Script Builder
-        </h3>
+        <h3 className="text-lg font-semibold text-blue-800 mb-3">💡 How to Use Script Builder</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-700">
           <div>
             <h4 className="font-medium mb-2">Script Syntax:</h4>
