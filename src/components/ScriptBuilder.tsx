@@ -5,8 +5,9 @@ import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { toast } from "sonner";
 import { useBtcWallet } from "@/lib/context/WalletContext";
-import { createScriptTransaction, addressToHex, isBitcoinAddress } from "@/lib/scriptUtils";
+import { createScriptTransaction, addressToHex, isBitcoinAddress, formatBalance } from "@/lib/scriptUtils";
 import { requestFaucetFunds } from "@/hooks/faucet";
+import ScriptEditor from "./ScriptEditor";
 
 const ScriptSchema = Yup.object().shape({
   scriptCode: Yup.string().required("Script code is required").min(1, "Script cannot be empty"),
@@ -16,7 +17,7 @@ const ScriptSchema = Yup.object().shape({
 const SCRIPT_EXAMPLES = {
   hashLock: `// Hash Lock Script - requires revealing a secret
 OP_SHA256 
-0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 
+0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824 
 OP_EQUAL`,
 
   timelock: `// Relative Timelock - funds locked for 144 blocks
@@ -247,7 +248,7 @@ export default function ScriptBuilder() {
           <div className="flex items-center space-x-4">
             {balance !== null && (
               <div className="text-sm text-gray-600">
-                Wallet Balance: <span className="font-medium">{balance.toLocaleString()} sats</span>
+                Wallet Balance: <span className="font-medium">{formatBalance(balance)}</span>
               </div>
             )}
             {isConnected && (
@@ -298,10 +299,26 @@ export default function ScriptBuilder() {
                 <label htmlFor="scriptCode" className="block text-sm font-medium text-gray-700 mb-2">
                   Bitcoin Script Code
                 </label>
-                <Field name="scriptCode">{({ field }: any) => <textarea {...field} id="scriptCode" rows={12} placeholder="Enter your Bitcoin script code here... Paste Bitcoin addresses to auto-convert to hex! (e.g., OP_SHA256 0x... OP_EQUAL)" onPaste={(e) => handlePaste(e, setFieldValue, values.scriptCode)} className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 font-mono text-sm bg-gray-50 ${errors.scriptCode && touched.scriptCode ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"}`} />}</Field>
+                <Field name="scriptCode">
+                  {({ field }: any) => (
+                    <ScriptEditor
+                      value={field.value}
+                      onChange={(value) => setFieldValue("scriptCode", value)}
+                      onPaste={(e) => handlePaste(e, setFieldValue, values.scriptCode)}
+                      placeholder="Enter your Bitcoin script code here... Paste Bitcoin addresses to auto-convert to hex!
+                      Example Hash Lock:
+                      // Hash Lock Script - requires revealing a secret
+                      OP_SHA256 
+                      0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824 
+                      OP_EQUAL"
+                      rows={12}
+                      className={errors.scriptCode && touched.scriptCode ? "border-red-500" : "border-gray-600"}
+                    />
+                  )}
+                </Field>
                 <ErrorMessage name="scriptCode" component="div" className="text-red-500 text-sm mt-1" />
                 <div className="text-xs text-gray-600 mt-2">
-                  💡 <strong>Tip:</strong> Paste Bitcoin addresses directly into the script editor - they'll automatically convert to hex format! Currently supports Taproot addresses (tb1p...).
+                  💡 <strong>Tip:</strong> The editor now features syntax highlighting! Paste Bitcoin addresses to auto-convert to hex. Currently supports Taproot addresses (tb1p...).
                 </div>
               </div>
 

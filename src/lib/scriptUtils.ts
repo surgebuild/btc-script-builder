@@ -3,9 +3,92 @@ import { initEccLib, networks, payments, Psbt, script as bitcoinScript, opcodes,
 import { ECPairFactory } from "ecpair";
 import { getUtxos, pushTx } from "@/hooks/api";
 
+// Script tracking types
+export interface TrackedScript {
+  id: string;
+  scriptAddress: string;
+  originalScript: string;
+  compiledScript: string;
+  createdAt: number;
+  createdBy: string;
+  fundingTxid: string;
+  amount: number;
+  isSpent: boolean;
+}
+
 // Initialize ECC library
 initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
+
+// Script tracking functions
+const TRACKED_SCRIPTS_KEY = "btc_tracked_scripts";
+
+export function saveTrackedScript(script: TrackedScript): void {
+  if (typeof window === "undefined") return;
+
+  const existingScripts = getTrackedScripts();
+  const updatedScripts = [...existingScripts, script];
+
+  localStorage.setItem(TRACKED_SCRIPTS_KEY, JSON.stringify(updatedScripts));
+  console.log("Saved tracked script:", script.scriptAddress);
+}
+
+export function getTrackedScripts(): TrackedScript[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const stored = localStorage.getItem(TRACKED_SCRIPTS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error("Error loading tracked scripts:", error);
+    return [];
+  }
+}
+
+export function getTrackedScriptsByWallet(walletAddress: string): TrackedScript[] {
+  return getTrackedScripts().filter((script) => script.createdBy === walletAddress);
+}
+
+export function markScriptAsSpent(scriptAddress: string): void {
+  if (typeof window === "undefined") return;
+
+  const scripts = getTrackedScripts();
+  const updatedScripts = scripts.map((script) => (script.scriptAddress === scriptAddress ? { ...script, isSpent: true } : script));
+
+  localStorage.setItem(TRACKED_SCRIPTS_KEY, JSON.stringify(updatedScripts));
+  console.log("Marked script as spent:", scriptAddress);
+}
+
+// Utility function to format balance in user-friendly way
+export function formatBalance(sats: number): string {
+  const BTC_THRESHOLD = 100000; // 0.001 BTC = 100,000 sats
+
+  if (sats >= BTC_THRESHOLD) {
+    const btc = sats / 100000000; // Convert to BTC
+    return `${btc.toFixed(8).replace(/\.?0+$/, "")} BTC`;
+  } else {
+    return `${sats.toLocaleString()} sats`;
+  }
+}
+
+// Utility function to format balance with both units for detailed view
+export function formatBalanceDetailed(sats: number): { primary: string; secondary: string } {
+  const BTC_THRESHOLD = 100000; // 0.001 BTC = 100,000 sats
+
+  if (sats >= BTC_THRESHOLD) {
+    const btc = sats / 100000000;
+    return {
+      primary: `${btc.toFixed(8).replace(/\.?0+$/, "")} BTC`,
+      secondary: `${sats.toLocaleString()} sats`,
+    };
+  } else {
+    const btc = sats / 100000000;
+    return {
+      primary: `${sats.toLocaleString()} sats`,
+      secondary: `${btc.toFixed(8)} BTC`,
+    };
+  }
+}
 
 // Utility function to convert Bitcoin address to hex public key
 export function addressToHex(bitcoinAddress: string): string | null {
@@ -224,7 +307,7 @@ export async function createScriptTransaction(scriptCode: string, amount: number
       try {
         // Fetch the actual transaction to get the correct output script
         console.log(`Fetching transaction ${utxo.txid} to get output script...`);
-        const ESPLORA_BASE = (process.env.NEXT_PUBLIC_BTC_ESPLORA_API || "https://mempool.space/testnet/api").replace(/\/$/, "");
+        const ESPLORA_BASE = (process.env.NEXT_PUBLIC_BTC_ESPLORA_API || "https://signet.surge.dev/api").replace(/\/$/, "");
         const txUrl = `${ESPLORA_BASE}/tx/${utxo.txid}`;
 
         const txResponse = await fetch(txUrl);
@@ -311,6 +394,23 @@ export async function createScriptTransaction(scriptCode: string, amount: number
     console.log("Step 11: Broadcasting transaction...");
     const txid = await pushTx(finalTx.toHex());
     console.log("Transaction broadcast successfully:", txid);
+
+    // Save tracked script for later unlocking
+    console.log("Step 12: Saving tracked script...");
+    const trackedScript: TrackedScript = {
+      id: `${txid}_0`, // Use txid + output index as unique ID
+      scriptAddress: p2wsh.address,
+      originalScript: scriptCode,
+      compiledScript: compiledScript.toString("hex"),
+      createdAt: Date.now(),
+      createdBy: walletAddress,
+      fundingTxid: txid,
+      amount: amount,
+      isSpent: false,
+    };
+
+    saveTrackedScript(trackedScript);
+    console.log("Tracked script saved for future unlocking");
 
     return {
       txid,

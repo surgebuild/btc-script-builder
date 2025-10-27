@@ -4,8 +4,8 @@ import { WalletProvider } from "@/lib/context/WalletContext";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Bitcoin Script Builder",
-  description: "A playground for testing Bitcoin scripts",
+  title: "Bitcoin Script Builder Playground",
+  description: "Create & execute custom Bitcoin scripts on testnet",
 };
 
 export default function RootLayout({
