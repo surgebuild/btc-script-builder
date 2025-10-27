@@ -43,24 +43,37 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="px-6 py-6 space-y-8">
-        {isConnected && (
-          <>
-            <ScriptBuilder />
-            <ScriptManager />
-          </>
-        )}
+      {isConnected ? (
+        <div className="flex h-screen bg-gray-50">
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Script Builder - Left Side */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              <ScriptBuilder />
+            </div>
+          </div>
 
-        {!isConnected && (
-          <div className="max-w-2xl mx-auto text-center py-16">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Bitcoin Script Builder</h1>
-            <p className="text-lg text-gray-600 mb-8">Create and broadcast custom Bitcoin script transactions on testnet</p>
-            <button onClick={connect} className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium">
+          {/* Right Sidebar - Script Manager */}
+          <div className="w-[540px] bg-white border-l border-gray-200 flex flex-col">
+            <div className="flex-1 overflow-y-auto">
+              <ScriptManager />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-orange-900 flex items-center justify-center">
+          <div className="max-w-md mx-auto text-center p-8 bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20">
+            <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <span className="text-white font-bold text-xl">₿</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-4">Bitcoin Script Builder</h1>
+            <p className="text-gray-300 mb-8">Create, test, and execute custom Bitcoin scripts on testnet</p>
+            <button onClick={connect} className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/25">
               Connect UniSat Wallet
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

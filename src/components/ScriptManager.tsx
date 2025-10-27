@@ -475,38 +475,48 @@ export default function ScriptManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">🔐 Your Bitcoin Scripts</h3>
-          <p className="text-sm text-gray-600">Manage and unlock your created script addresses</p>
+    <div className="h-full flex flex-col bg-white">
+      {/* Sidebar Header */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">🔐</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 font-mono">Scripts</h2>
+              <p className="text-xs text-gray-600">Manage deployed contracts</p>
+            </div>
+          </div>
+          <button onClick={loadScripts} disabled={loading} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Refresh scripts">
+            <div className={`w-4 h-4 text-gray-500 ${loading ? "animate-spin" : ""}`}>↻</div>
+          </button>
         </div>
-        <button onClick={loadScripts} disabled={loading} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-          {loading ? "Loading..." : "Refresh"}
-        </button>
       </div>
 
-      {loading && (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
-          <p className="text-gray-600 mt-2">Loading scripts...</p>
-        </div>
-      )}
-
-      {!loading && scriptUtxos.length === 0 && (
-        <div className="text-center py-8 bg-gray-50 rounded-lg">
-          <p className="text-gray-600">No scripts found</p>
-          <p className="text-sm text-gray-500 mt-1">Create your first script using the Script Builder above</p>
-        </div>
-      )}
-
-      {!loading && scriptUtxos.length > 0 && (
-        <div className="space-y-4">
-          {scriptUtxos.map((script) => (
-            <ScriptCard key={script.id} script={script} onUnlock={unlockScript} isUnlocking={unlockingScript === script.id} />
-          ))}
-        </div>
-      )}
+      {/* Scripts List */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+              <div className="text-sm text-gray-600 font-mono">Loading scripts...</div>
+            </div>
+          </div>
+        ) : scriptUtxos.length === 0 ? (
+          <div className="text-center py-12 px-6">
+            <div className="text-6xl mb-4 opacity-50">📜</div>
+            <div className="text-gray-600 font-mono text-sm mb-2">No scripts deployed</div>
+            <div className="text-gray-500 text-xs">Deploy your first script using the editor</div>
+          </div>
+        ) : (
+          <div className="space-y-3 p-4">
+            {scriptUtxos.map((script) => (
+              <ScriptCard key={script.id} script={script} onUnlock={unlockScript} isUnlocking={unlockingScript === script.id} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -557,35 +567,39 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
   };
 
   return (
-    <div className={`border rounded-lg p-4 ${isAvailable ? "border-green-200 bg-green-50" : isSpent ? "border-gray-200 bg-gray-50" : "border-orange-200 bg-orange-50"}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <div className={`w-3 h-3 rounded-full ${isAvailable ? "bg-green-500" : isSpent ? "bg-gray-400" : "bg-orange-500"}`}></div>
-          <div>
-            <h4 className="font-medium text-gray-900">
-              {script.scriptAddress.slice(0, 20)}...{script.scriptAddress.slice(-10)}
-            </h4>
-            <p className="text-sm text-gray-600">
-              Created {new Date(script.createdAt).toLocaleDateString()} • {formatBalance(script.amount)}
-            </p>
+    <div className={`rounded-2xl border-2 transition-all duration-200 hover:shadow-lg ${isAvailable ? "border-green-300 bg-green-50/50 hover:bg-green-50" : isSpent ? "border-gray-300 bg-gray-50/50 hover:bg-gray-50" : "border-orange-300 bg-orange-50/50 hover:bg-orange-50"}`}>
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3 cursor-pointer hover:bg-white/50 rounded-lg p-2 -m-2 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="flex items-start space-x-3 flex-1 min-w-0">
+            <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${isAvailable ? "bg-green-500" : isSpent ? "bg-gray-400" : "bg-orange-500"}`}></div>
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-sm text-gray-900 mb-1 truncate">
+                {script.scriptAddress.slice(0, 12)}...{script.scriptAddress.slice(-12)}
+              </div>
+              <div className="text-xs text-gray-600 font-mono mb-2">
+                {new Date(script.createdAt).toLocaleDateString()} • {formatBalance(script.amount)}
+              </div>
+              <div className="flex items-center space-x-2 flex-wrap">
+                {isAvailable && <div className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 text-xs font-mono rounded-lg">{formatBalance(script.balance)}</div>}
+                {isSpent && <div className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 text-xs font-mono rounded-lg">✓ Spent</div>}
+                {isWaiting && <div className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-600 text-xs font-mono rounded-lg">⏳ Pending</div>}
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-2">
-          {isAvailable && <div className="text-sm font-medium text-green-700">{formatBalance(script.balance)} available</div>}
-          {isSpent && <div className="text-sm font-medium text-gray-500">✓ Spent</div>}
-          {isWaiting && <div className="text-sm font-medium text-orange-600">⏳ Waiting for funds</div>}
-          <button onClick={() => setIsExpanded(!isExpanded)} className="text-gray-500 hover:text-gray-700">
-            {isExpanded ? "▲" : "▼"}
-          </button>
+          <div className="p-1 flex-shrink-0">
+            <div className={`transform transition-transform text-gray-400 ${isExpanded ? "rotate-180" : ""}`}>▼</div>
+          </div>
         </div>
       </div>
 
       {isExpanded && (
-        <div className="space-y-4 pt-4 border-t">
+        <div className="border-t border-gray-200 p-4 space-y-4 bg-white/50 rounded-b-2xl">
           <div>
-            <h5 className="font-medium text-gray-700 mb-2">Original Script:</h5>
-            <pre className="bg-gray-100 p-3 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto">{script.originalScript}</pre>
+            <div className="text-sm font-semibold text-gray-700 mb-2 font-mono">Script Source</div>
+            <div className="bg-gray-900 rounded-xl p-4 overflow-x-auto">
+              <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">{script.originalScript}</pre>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -631,14 +645,19 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
           )}
 
           {isAvailable && (
-            <div className="pt-4 border-t">
+            <div className="border-t border-gray-200 pt-4">
               {!showUnlockForm ? (
-                <button onClick={() => setShowUnlockForm(true)} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium">
+                <button onClick={() => setShowUnlockForm(true)} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl font-mono">
                   🔓 Unlock Script
                 </button>
               ) : (
-                <div className="space-y-3">
-                  <h5 className="font-medium text-gray-700">Provide Witness Data to Unlock Script:</h5>
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-semibold text-gray-900 font-mono">Witness Stack</h5>
+                    <button onClick={() => setShowUnlockForm(false)} className="text-gray-500 hover:text-gray-700 text-sm px-2 py-1 hover:bg-gray-100 rounded-lg">
+                      ✕
+                    </button>
+                  </div>
 
                   {/* Debug info */}
                   <div className="text-xs bg-blue-50 p-2 rounded border">
@@ -674,34 +693,28 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
                   </div>
 
                   {witnessInputs.map((input, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <input type="text" value={input} onChange={(e) => updateWitnessInput(index, e.target.value)} placeholder={`Witness ${index + 1} (e.g., 0x1234..., hello, 42, OP_TRUE)`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" />
-                      {witnessInputs.length > 1 && (
-                        <button onClick={() => removeWitnessInput(index)} className="px-2 py-2 text-red-500 hover:text-red-700">
-                          ×
-                        </button>
-                      )}
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-gray-600 font-mono">Stack[{index}]</div>
+                        {witnessInputs.length > 1 && (
+                          <button onClick={() => removeWitnessInput(index)} className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors">
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      <input type="text" value={input} onChange={(e) => updateWitnessInput(index, e.target.value)} placeholder={`Witness data (0x1234..., hello, 42, OP_TRUE)`} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-mono bg-gray-50 focus:bg-white focus:border-orange-400 focus:outline-none transition-colors" />
                     </div>
                   ))}
 
-                  <div className="flex items-center space-x-2">
-                    <button onClick={addWitnessInput} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-sm">
-                      + Add Input
+                  <div className="flex items-center space-x-3 pt-2">
+                    <button onClick={addWitnessInput} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-mono transition-colors">
+                      + Add Stack Item
                     </button>
                   </div>
 
-                  <div className="flex items-center space-x-2 pt-2">
-                    <button onClick={handleUnlock} disabled={isUnlocking} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                      {isUnlocking ? "Unlocking..." : "🔓 Unlock Now"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUnlockForm(false);
-                        setWitnessInputs([""]);
-                      }}
-                      className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium"
-                    >
-                      Cancel
+                  <div className="flex items-center space-x-3 pt-4 border-t">
+                    <button onClick={handleUnlock} disabled={isUnlocking} className="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all duration-200 font-mono">
+                      {isUnlocking ? "🔄 Processing..." : "🔓 Execute Unlock"}
                     </button>
                   </div>
 
