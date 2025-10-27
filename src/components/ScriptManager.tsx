@@ -8,6 +8,92 @@ import { getUtxos, getTransaction, pushTx } from "@/hooks/api";
 import { networks, payments, Psbt, script as bitcoinScript, address, Transaction } from "bitcoinjs-lib";
 import { createHash } from "crypto";
 
+// Helper function to format script with syntax highlighting
+const formatScriptWithSyntaxHighlighting = (scriptText: string) => {
+  const lines = scriptText.split("\n");
+
+  return lines.map((line, lineIndex) => {
+    const trimmedLine = line.trim();
+
+    // Handle comments
+    if (trimmedLine.startsWith("//")) {
+      return (
+        <div key={lineIndex} className="text-gray-500 italic">
+          {line}
+        </div>
+      );
+    }
+
+    // Handle empty lines
+    if (!trimmedLine) {
+      return <div key={lineIndex}>&nbsp;</div>;
+    }
+
+    // Process tokens in the line
+    const tokens = line.split(/(\s+)/); // Keep whitespace
+    const coloredTokens = tokens.map((token, tokenIndex) => {
+      const trimmedToken = token.trim();
+
+      if (!trimmedToken || /^\s+$/.test(token)) {
+        return <span key={tokenIndex}>{token}</span>;
+      }
+
+      let className = "text-white";
+
+      if (trimmedToken.startsWith("OP_")) {
+        // Crypto operations
+        if (trimmedToken.includes("SHA") || trimmedToken.includes("HASH") || trimmedToken.includes("RIPEMD")) {
+          className = "text-red-400";
+        }
+        // Signature operations
+        else if (trimmedToken.includes("SIG") || trimmedToken.includes("CHECKSIG") || trimmedToken.includes("CHECKMULTISIG")) {
+          className = "text-pink-400";
+        }
+        // Math and logic operations
+        else if (trimmedToken.includes("ADD") || trimmedToken.includes("SUB") || trimmedToken.includes("MUL") || trimmedToken.includes("DIV") || trimmedToken.includes("MOD") || trimmedToken.includes("EQUAL") || trimmedToken.includes("GREATERTHAN") || trimmedToken.includes("LESSTHAN") || trimmedToken.includes("MIN") || trimmedToken.includes("MAX") || trimmedToken.includes("WITHIN") || trimmedToken.includes("BOOLAND") || trimmedToken.includes("BOOLOR") || trimmedToken.includes("NOT")) {
+          className = "text-blue-400";
+        }
+        // Stack operations
+        else if (trimmedToken.includes("DUP") || trimmedToken.includes("DROP") || trimmedToken.includes("SWAP") || trimmedToken.includes("ROT") || trimmedToken.includes("PICK") || trimmedToken.includes("ROLL") || trimmedToken.includes("OVER") || trimmedToken.includes("NIP") || trimmedToken.includes("TUCK") || trimmedToken.includes("DEPTH") || trimmedToken.includes("SIZE")) {
+          className = "text-purple-400";
+        }
+        // Time lock operations
+        else if (trimmedToken.includes("CHECKLOCKTIMEVERIFY") || trimmedToken.includes("CHECKSEQUENCEVERIFY")) {
+          className = "text-orange-400";
+        }
+        // Flow control
+        else if (trimmedToken.includes("IF") || trimmedToken.includes("ELSE") || trimmedToken.includes("ENDIF") || trimmedToken.includes("VERIFY") || trimmedToken.includes("RETURN")) {
+          className = "text-indigo-400";
+        }
+        // Constants
+        else if (trimmedToken === "OP_0" || trimmedToken === "OP_FALSE" || trimmedToken === "OP_TRUE" || /^OP_[1-9]$/.test(trimmedToken) || /^OP_1[0-6]$/.test(trimmedToken)) {
+          className = "text-green-400";
+        }
+        // Other opcodes
+        else {
+          className = "text-yellow-400";
+        }
+      }
+      // Hex data
+      else if (trimmedToken.startsWith("0x") && /^0x[0-9a-fA-F]+$/.test(trimmedToken)) {
+        className = "text-cyan-400";
+      }
+      // Numbers
+      else if (/^\d+$/.test(trimmedToken)) {
+        className = "text-green-400";
+      }
+
+      return (
+        <span key={tokenIndex} className={className}>
+          {token}
+        </span>
+      );
+    });
+
+    return <div key={lineIndex}>{coloredTokens}</div>;
+  });
+};
+
 interface ScriptUtxo extends TrackedScript {
   utxos: any[];
   balance: number;
@@ -418,7 +504,7 @@ export default function ScriptManager() {
       const unlockTxid = await pushTx(finalTx.toHex());
       console.log("🎉 Script unlocked successfully!");
       console.log("📋 Full Transaction Hash:", unlockTxid);
-      console.log("🔗 Block Explorer:", `https://signet.surge.dev/tx/${unlockTxid}`);
+      console.log("🔗 Mempool Explorer:", `https://signet.surge.dev/tx/${unlockTxid}`);
 
       // Mark script as spent
       markScriptAsSpent(script.scriptAddress);
@@ -433,7 +519,7 @@ export default function ScriptManager() {
             <div className="font-mono break-all bg-gray-100 p-1 rounded mt-1">{unlockTxid}</div>
           </div>
           <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline text-xs">
-            🔗 View on Block Explorer
+            🔗 View on Mempool
           </a>
         </div>,
         {
@@ -597,15 +683,17 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
         <div className="border-t border-gray-200 p-4 space-y-4 bg-white/50 rounded-b-2xl">
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2 font-mono">Script Source</div>
-            <div className="bg-gray-900 rounded-xl p-4 overflow-x-auto">
-              <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">{script.originalScript}</pre>
+            <div className="bg-gray-900 rounded-xl p-4 overflow-x-auto border border-gray-700">
+              <div className="text-sm font-mono whitespace-pre-wrap leading-6">{formatScriptWithSyntaxHighlighting(script.originalScript)}</div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="font-medium text-gray-700">Funding TX:</span>
-              <div className="mt-1 font-mono text-xs break-all">{script.fundingTxid}</div>
+              <span className="font-medium text-gray-700">Funding Tx:</span>
+              <a href={`https://signet.surge.dev/tx/${script.fundingTxid}`} target="_blank" rel="noopener noreferrer" className="mt-1 font-mono text-xs break-all text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors block" title="View transaction on mempool.space">
+                {script.fundingTxid}
+              </a>
             </div>
             <div>
               <span className="font-medium text-gray-700">UTXOs:</span>
@@ -636,7 +724,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
                       </button>
                     </div>
                     <a href={`https://signet.surge.dev/tx/${script.unlockTxid}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 underline text-sm">
-                      🔗 View on Block Explorer
+                      🔗 View on Mempool
                     </a>
                   </div>
                 </div>
@@ -648,7 +736,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
             <div className="border-t border-gray-200 pt-4">
               {!showUnlockForm ? (
                 <button onClick={() => setShowUnlockForm(true)} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl font-mono">
-                  🔓 Unlock Script
+                  Unlock Script
                 </button>
               ) : (
                 <div className="bg-white rounded-xl border-2 border-gray-200 p-4 space-y-4">
