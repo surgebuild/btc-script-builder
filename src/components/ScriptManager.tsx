@@ -659,7 +659,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
           <div className="flex items-start space-x-3 flex-1 min-w-0">
             <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 ${isAvailable ? "bg-green-500" : isSpent ? "bg-gray-400" : "bg-orange-500"}`}></div>
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-sm text-gray-900 mb-1 truncate">
+              <div className="font-mono text-sm text-gray-900 mb-1 truncate overflow-hidden">
                 {script.scriptAddress.slice(0, 12)}...{script.scriptAddress.slice(-12)}
               </div>
               <div className="text-xs text-gray-600 font-mono mb-2">
@@ -684,22 +684,16 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2 font-mono">Script Source</div>
             <div className="bg-gray-900 rounded-xl p-4 overflow-x-auto border border-gray-700">
-              <div className="text-sm font-mono whitespace-pre-wrap leading-6">{formatScriptWithSyntaxHighlighting(script.originalScript)}</div>
+              <div className="text-sm font-mono whitespace-pre-wrap leading-6 break-all">{formatScriptWithSyntaxHighlighting(script.originalScript)}</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="text-sm">
             <div>
               <span className="font-medium text-gray-700">Funding Tx:</span>
               <a href={`https://signet.surge.dev/tx/${script.fundingTxid}`} target="_blank" rel="noopener noreferrer" className="mt-1 font-mono text-xs break-all text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors block" title="View transaction on mempool.space">
                 {script.fundingTxid}
               </a>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">UTXOs:</span>
-              <div className="mt-1">
-                {script.utxos.length} found ({formatBalance(script.balance)} total)
-              </div>
             </div>
           </div>
 
@@ -711,7 +705,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
                   <h6 className="font-medium text-green-800 mb-2">✅ Unlock Transaction</h6>
                   <div className="text-sm">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="font-mono text-xs break-all bg-white p-2 rounded border flex-1">{script.unlockTxid}</div>
+                      <div className="font-mono text-xs break-all bg-white p-2 rounded border flex-1 overflow-hidden">{script.unlockTxid}</div>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(script.unlockTxid!);
@@ -750,8 +744,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
                   {/* Debug info */}
                   <div className="text-xs bg-blue-50 p-2 rounded border">
                     <strong>Script Analysis:</strong>
-                    <div>Script: {script.originalScript.substring(0, 100)}...</div>
-                    <div>Expected hash: {script.originalScript.match(/0x[a-fA-F0-9]{64}/)?.[0] || "Not found"}</div>
+                    <div className="break-all">{script.originalScript.substring(0, 100)}...</div>
                     <div className="mt-1">
                       <strong>Hash Analysis:</strong>
                       {witnessInputs
@@ -772,8 +765,11 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
                           const matches = expectedHash === sha256Hash;
 
                           return (
-                            <div key={idx} className={`p-1 rounded ${matches ? "bg-green-100" : "bg-red-100"}`}>
-                              Input "{trimmed}" → SHA256: 0x{sha256Hash} {matches ? "✅" : "❌"}
+                            <div key={idx} className={`p-1 rounded break-all font-mono text-xs ${matches ? "bg-green-100" : "bg-red-100"}`}>
+                              <div className="break-words">Input "{trimmed}" → SHA256:</div>
+                              <div className="break-all">
+                                0x{sha256Hash} {matches ? "✅" : "❌"}
+                              </div>
                             </div>
                           );
                         })}
@@ -790,7 +786,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
                           </button>
                         )}
                       </div>
-                      <input type="text" value={input} onChange={(e) => updateWitnessInput(index, e.target.value)} placeholder={`Witness data (0x1234..., hello, 42, OP_TRUE)`} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-mono bg-gray-50 focus:bg-white focus:border-orange-400 focus:outline-none transition-colors" />
+                      <input type="text" value={input} onChange={(e) => updateWitnessInput(index, e.target.value)} placeholder={`Witness data (0x1234..., hello, 42, OP_TRUE)`} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-mono bg-gray-50 focus:bg-white focus:border-orange-400 focus:outline-none transition-colors overflow-hidden" />
                     </div>
                   ))}
 
@@ -802,7 +798,7 @@ function ScriptCard({ script, onUnlock, isUnlocking }: ScriptCardProps) {
 
                   <div className="flex items-center space-x-3 pt-4 border-t">
                     <button onClick={handleUnlock} disabled={isUnlocking} className="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all duration-200 font-mono">
-                      {isUnlocking ? "🔄 Processing..." : "🔓 Execute Unlock"}
+                      {isUnlocking ? "Processing..." : "Execute Unlock"}
                     </button>
                   </div>
 
